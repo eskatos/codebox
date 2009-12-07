@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+#
+# codebox-backup
+#
+# Read its configuration from ../etc/codebox/backup.conf
+#
+
+require File.dirname(__FILE__) + "/../lib/codebox/airbackup/airbackup.rb"
+
+def check_usage
+end
+
+if $0 == __FILE__
+    check_usage
+    backup_repos = AirBackup::BackupRepository.new(File.dirname(__FILE__) + "/../etc/codebox/backup.conf")
+    backup_repos.each do |each_backup|
+        puts " >> backup for #{each_backup.name}"
+        puts "---------------------------------------------------------------------------------------"
+        each_backup.backup
+        puts "---------------------------------------------------------------------------------------"
+        puts
+    end
+end

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# TODO resolve the script paths
+
+ln -s /usr/local/sbin/codebox-permissions /etc/cron.daily/
+

@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+#
+# codebox-backup-prune
+#
+# Read its configuration from ../etc/codebox/backup.conf
+#
+
+require File.dirname(__FILE__) + "/../lib/codebox/airbackup/airbackup.rb"
+
+def check_usage
+    if ARGV[0] == nil || ARGV[0].to_i <= 0
+        puts "Usage: codebox-backup-prune older_than_days"
+        exit 1
+    end
+end
+
+if $0 == __FILE__
+    check_usage
+    days = ARGV[0].to_i
+    puts
+    backup_repos = AirBackup::BackupRepository.new(File.dirname(__FILE__) + "/../etc/codebox/backup.conf")
+    backup_repos.each do |each_backup|
+        puts " >> removing backups older than #{days} day(s) in #{each_backup.name}"
+        puts "---------------------------------------------------------------------------------------"
+        each_backup.remove_older_than(days)
+        puts "---------------------------------------------------------------------------------------"
+        puts
+        puts
+    end
+end

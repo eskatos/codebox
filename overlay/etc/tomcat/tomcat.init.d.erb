@@ -1,0 +1,18 @@
+#!/bin/sh
+
+CATALINA_HOME="<%= @opt %>/apache-tomcat-6.0.20"
+
+case $1 in
+    start)
+        sh ${CATALINA_HOME}/bin/startup.sh
+    ;;
+    stop)
+        sh ${CATALINA_HOME}/bin/shutdown.sh
+    ;;
+    restart)
+        sh ${CATALINA_HOME}/bin/shutdown.sh
+        sh ${CATALINA_HOME}/bin/startup.sh
+    ;;
+esac
+
+exit 0

@@ -1,0 +1,29 @@
+#!/usr/bin/env ruby
+#
+# codebox-restore
+#
+# Read its configuration from ../etc/codebox/backup.conf
+#
+# TODO : require user confirmation unless --force is set
+
+
+require File.dirname(__FILE__) + "/../lib/codebox/airbackup/airbackup.rb"
+
+def check_usage
+    if ARGV.length > 1 || (ARGV.length == 1 && ARGV[0] != "--force")
+        puts "Usage: codebox-restore [--force]"
+        exit 1
+    end
+end
+
+if $0 == __FILE__
+    check_usage
+    backup_repos = AirBackup::BackupRepository.new(File.dirname(__FILE__) + "/../etc/codebox/backup.conf")
+    backup_repos.each do |each_backup|
+        puts " >> quick_restore for #{each_backup.name}"
+        puts "---------------------------------------------------------------------------------------"
+        each_backup.quick_restore
+        puts "---------------------------------------------------------------------------------------"
+        puts
+    end
+end

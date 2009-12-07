@@ -1,0 +1,246 @@
+#!/usr/bin/env ruby
+
+require 'fileutils'
+require 'openssl'
+require 'erb'
+require File.dirname(__FILE__) + '/../lib/codebox/commons.rb'
+
+class Codebox::Install
+
+    include Codebox::Out
+    include Codebox::System
+
+    def initialize
+        @etc  = File.expand_path File.dirname(__FILE__) + '/../etc'
+        @bin  = File.expand_path File.dirname(__FILE__) + '/../bin'
+        @sbin = File.expand_path File.dirname(__FILE__)
+        @opt  = File.expand_path File.dirname(__FILE__) + '/../opt'
+        @var  = File.expand_path File.dirname(__FILE__) + '/../var'
+        ENV['DEBIAN_FRONTEND'] = 'noninteractive'
+    end
+
+    def sanity_check
+        unless Process.uid == 0
+            error 'Must be run as root'
+            exit 1
+        end
+        unless running_on_debian and debian_version[0] == '5'
+            error 'Must be run on a Debian 5.x'
+            exit 1
+        end
+        info 'codebox-install: sanity check passed'
+    end
+
+    def gather_input
+        @user_input = {
+            :country => 'FR',
+            :domainname => 'codebox.codeartisans.org'
+        }
+        @user_input[:country] = input('In which country will this codebox install be hosted? ')
+        @user_input[:domainname] = input('What domain name will be used to access this codebox install? ')
+        info "codebox-install: all user input gathered: #{@user_input.inspect}"
+    end
+
+    def configure_apt
+        FileUtils.ln_sf("#{@etc}/apt/preferences", '/etc/apt/preferences')
+        FileUtils.ln_sf("#{@etc}/apt/sources.list", '/etc/apt/sources.list')
+        info 'codebox-install: apt configured'
+    end
+
+    def update_debian
+        execute('aptitude update', true)
+        execute('aptitude -y safe-upgrade', true)
+        info 'codebox-install: debian is up to date'
+    end
+
+    def add_service_users
+        ['gitosis','redmine','hudson','nexus','sonar','tomcat'].each do |username|
+            execute("adduser --system --shell /bin/false --group --disabled-password --home /home/#{username} #{username}")
+        end
+        info 'codebox-install: service users added'
+    end
+
+    def install_debs
+        execute('aptitude -y install sudo vim screen wget unzip tree openssh-server nginx munin munin-node firehol rake ruby1.8-dev make g++ imagemagick librmagick-ruby1.8 libzlib-ruby sun-java6-jdk subversion mysql-server libmysql-ruby1.8 git-core gitosis duplicity rails mongrel', true)
+        info 'codebox-install: debian packages installed'
+    end
+
+    def install_rubygems
+        info 'codebox-install: ruby gems installed'
+    end
+
+    def install_externals
+        # download
+        ext_dl_dir = '/tmp/codebox-install/ext'
+        FileUtils.mkdir_p(ext_dl_dir)
+        {
+            'http://mir2.ovh.net/ftp.apache.org/dist/maven/binaries/apache-maven-2.2.1-bin.tar.gz' => 'maven.tar.gz',
+            'http://dist.sonar.codehaus.org/sonar-1.11.1.zip' => 'sonar.zip',
+            'http://rubyforge.org/frs/download.php/66633/redmine-0.8.6.tar.gz' => 'redmine.tar.gz',
+            'http://r-labs.googlecode.com/files/redmine_hudson-1.0.0.zip' => 'redmine_hudson-1.0.0.zip',
+            'http://nexus.sonatype.org/downloads/nexus-webapp-1.4.0.war' => 'nexus.war',
+            'http://hudson-ci.org/supported/hudson.war' => 'hudson.war',
+            'https://hudson.dev.java.net/files/documents/2402/135478/git.hpi' => 'git.hpi',
+            'https://hudson.dev.java.net/files/documents/2402/140299/sonar.hpi' => 'sonar.hpi',
+            'https://hudson.dev.java.net/files/documents/2402/143684/rake.hpi' => 'rake.hpi',
+            'http://mir2.ovh.net/ftp.apache.org/dist/tomcat/tomcat-6/v6.0.20/bin/apache-tomcat-6.0.20.tar.gz' => 'tomcat.tar.gz'
+            
+        }.each_pair do |url, target|
+            execute("wget -c -O \"#{ext_dl_dir}/#{target}\" \"#{url}\"", true)
+        end
+        # unpack
+        FileUtils.mkdir_p(@opt)
+        execute("tar xzf #{ext_dl_dir}/maven.tar.gz -C #{@opt}", true)
+        FileUtils.ln_sf("#{@opt}/apache-maven-2.2.1", "#{@opt}/maven")
+        execute("unzip #{ext_dl_dir}/sonar.zip -d #{@opt}", true)
+        FileUtils.ln_sf("#{@opt}/sonar-1.11.1", "#{@opt}/sonar")
+        execute("tar xzf #{ext_dl_dir}/redmine.tar.gz -C #{@opt}", true)
+        FileUtils.ln_sf("#{@opt}/redmine-0.8.6", "#{@opt}/redmine")
+        execute("unzip #{ext_dl_dir}/redmine_hudson-1.0.0.zip -d #{@opt}/redmine/vendor/plugins", true)
+        execute("tar xzf #{ext_dl_dir}/tomcat.tar.gz -C #{@opt}", true)
+        FileUtils.mv("#{@opt}/apache-tomcat-6.0.20/webapps",'/home/tomcat/webapps', :force => true)
+        FileUtils.mv("#{@opt}/apache-tomcat-6.0.20/temp",'/home/tomcat/temp', :force => true)
+        FileUtils.mv("#{@opt}/apache-tomcat-6.0.20/logs",'/home/tomcat/logs', :force => true)
+        FileUtils.mv("#{@opt}/apache-tomcat-6.0.20/work",'/home/tomcat/work', :force => true)
+        FileUtils.mv("#{@opt}/apache-tomcat-6.0.20/conf",'/home/tomcat/conf', :force => true)
+        FileUtils.ln_sf('/home/tomcat/webapps',"#{@opt}/apache-tomcat-6.0.20/webapps")
+        FileUtils.ln_sf('/home/tomcat/temp',"#{@opt}/apache-tomcat-6.0.20/temp")
+        FileUtils.ln_sf('/home/tomcat/logs',"#{@opt}/apache-tomcat-6.0.20/logs")
+        FileUtils.ln_sf('/home/tomcat/work',"#{@opt}/apache-tomcat-6.0.20/work")
+        FileUtils.ln_sf('/home/tomcat/conf',"#{@opt}/apache-tomcat-6.0.20/conf")
+        FileUtils.cp("#{ext_dl_dir}/nexus.war", '/home/tomcat/webapps/nexus.war')
+        FileUtils.cp("#{ext_dl_dir}/hudson.war", '/home/tomcat/webapps/hudson.war')
+        FileUtils.mkdir_p('/home/hudson/plugins')
+        FileUtils.cp("#{ext_dl_dir}/git.hpi", '/home/hudson/plugins/git.hpi')
+        FileUtils.cp("#{ext_dl_dir}/sonar.hpi", '/home/hudson/plugins/sonar.hpi')
+        FileUtils.cp("#{ext_dl_dir}/rake.hpi", '/home/hudson/plugins/rake.hpi')
+        info 'codebox-install: external software installed'
+    end
+
+    def generate_certificates
+        privkey = OpenSSL::PKey::RSA.generate(4096)
+        pubkey = privkey.public_key
+        dn = OpenSSL::X509::Name.parse("/C=#{@user_input[:country]}/O=codeartians/OU=codebox/CN=#{@user_input[:domainname]}")
+        cert = OpenSSL::X509::Certificate.new
+        cert.version = 3
+        cert.serial = 1
+        cert.subject = dn
+        cert.issuer = dn
+        cert.public_key = pubkey
+        cert.not_before = Time.now
+        cert.not_after = Time.now + 3600 * 24 * 365
+        p12 = OpenSSL::PKCS12.create("changeit", @user_input[:domainname], privkey, cert)
+        FileUtils.mkdir_p("#{@etc}/nginx/ssl")
+        File.open("#{@etc}/nginx/ssl/#{@user_input[:domainname]}.p12", 'w') { |f| f.write p12.to_der }
+        File.open("#{@etc}/nginx/ssl/#{@user_input[:domainname]}.key", 'w') { |f| f.write privkey.to_pem }
+        File.open("#{@etc}/nginx/ssl/#{@user_input[:domainname]}.crt", 'w') { |f| f.write cert.to_pem }
+        info 'codebox-install: self signed certificate generated'
+    end
+
+    def configure_debs
+        # firehol
+        FileUtils.ln_sf("#{@etc}/firehol/firehol.conf", '/etc/firehol/firehol.conf')
+        FileUtils.ln_sf("#{@etc}/default/firehol", '/etc/default/firehol')
+        # munin
+        FileUtils.ln_sf("#{@etc}/munin/munin.conf", '/etc/munin/munin.conf')
+        # nginx
+        FileUtils.mkdir_p("#{@etc}/nginx/sites-available")
+        vhost_template = ERB.new(IO.read("#{@etc}/nginx/codebox-template.erb").to_s)
+        vhost = "#{@etc}/nginx/sites-available/#{@user_input[:domainname]}"
+        File.open(vhost, 'w') { |f| f.write vhost_template.result(binding) }
+        FileUtils.ln_sf(vhost, "/etc/nginx/sites-enabled/#{@user_input[:domainname]}")
+        FileUtils.ln_sf("#{@etc}/nginx/ssl", '/etc/nginx/ssl')
+        # mysql
+        execute("mysqladmin -u root password 'root'", true)
+        # gitosis
+        execute('sudo -H -u gitosis ssh-keygen -N \'\' -t rsa -f /home/gitosis/.ssh/id_rsa', true)
+        execute('sudo -H -u gitosis gitosis-init < /home/gitosis/.ssh/id_rsa.pub', true)
+    end
+
+    def configure_externals
+        # global
+        FileUtils.ln_sf("#{@etc}/profile", '/etc/profile')
+        FileUtils.ln_sf("#{@etc}/rc.local", '/etc/rc.local')
+        # nexus
+        FileUtils.mkdir_p('/home/nexus/work')
+        # sonar
+        execute('echo "create database sonar character set utf8 collate utf8_general_ci;" | mysql -u root -proot', true)
+        execute('echo "grant all privileges on sonar.* to \'sonar\'@\'localhost\' identified by \'sonar\';" | mysql -u root -proot', true)
+        File.open('/etc/init.d/sonar', 'w') {|f| f.write("#!/bin/sh
+### BEGIN INIT INFO
+# Provides: Sonar
+# Required-Start: $local_fs $network $syslog
+# Should-Start:
+# Required-Stop:
+# Default-Start: 2 3 4 5
+# Default-Stop: 0 1 6
+# Short-Description: Sonar
+# Description: Sonar
+### END INIT INFO
+
+#{@bin}/sonar $*
+exit $?") }
+        FileUtils.chmod(0755, '/etc/init.d/sonar')
+        FileUtils.cp("#{@etc}/sonar/sonar.sh", "#{@opt}/sonar/bin/linux-x86-32/sonar.sh")
+        FileUtils.ln_sf("#{@opt}/sonar/bin/linux-x86-32/sonar.sh", "#{@bin}/sonar")
+        FileUtils.ln_sf("#{@etc}/sonar/sonar.properties", "#{@opt}/sonar/conf/sonar.properties")
+        execute("update-rc.d sonar defaults", true)
+        # redmine
+        FileUtils.ln_sf("#{@etc}/redmine/database.yml", "#{@opt}/redmine/config/database.yml")
+        execute('echo "create database redmine character set utf8;" | mysql -u root -proot', true)
+        execute('echo "grant all privileges on redmine.* to \'redmine\'@\'localhost\' identified by \'redmine\';" | mysql -u root -proot', true)
+        execute('echo "flush privileges;" | mysql -u root -proot', true)
+        execute("cd #{@opt}/redmine && rake db:migrate RAILS_ENV=production ; cd -", true)
+        execute("cd #{@opt}/redmine && rake redmine:load_default_data RAILS_ENV=production REDMINE_LANG=en; cd -", true)
+        execute("cd #{@opt}/redmine && rake db:migrate_plugins RAILS_ENV=production ; cd -", true)
+        # tomcat
+        tomcat_init_tpl = ERB.new(IO.read("#{@etc}/tomcat/tomcat.init.d.erb").to_s)
+        FileUtils.mkdir_p("#{@etc}/init.d")
+        tomcat_init = "#{@etc}/init.d/tomcat"
+        File.open(tomcat_init, 'w') { |f| f.write tomcat_init_tpl.result(binding) }
+        FileUtils.chmod(0755, tomcat_init)
+        FileUtils.ln_sf(tomcat_init, '/etc/init.d/tomcat')
+        execute("update-rc.d tomcat defaults", true)
+    end
+
+    def register_cron_jobs
+        FileUtils.ln_sf("#{@sbin}/codebox-permissions", '/etc/cron.daily/codebox-permissions')
+        info 'codebox-install: cron jobs registered'
+    end
+
+    def fix_permissions
+        execute(@sbin + '/codebox-permissions', true)
+        info 'codebox-install: permissions fixed'
+    end
+
+    def restart_services
+        execute('/etc/init.d/firehol restart', true)
+        execute('/etc/init.d/tomcat restart', true)
+        execute('/etc/init.d/sonar restart', true)
+        execute('/etc/rc.local', true)
+        execute('/etc/init.d/nginx restart', true)
+        info 'codebox-install: services restarted'
+    end
+
+end
+
+if $0 == __FILE__
+
+
+    installer = Codebox::Install.new
+    installer.sanity_check
+    installer.gather_input
+    installer.configure_apt
+    installer.update_debian
+    installer.add_service_users
+    installer.install_debs
+    installer.install_rubygems
+    installer.install_externals
+    installer.generate_certificates
+    installer.configure_debs
+    installer.configure_externals
+    installer.register_cron_jobs
+    installer.fix_permissions
+    installer.restart_services
+
+end

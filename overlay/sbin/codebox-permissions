@@ -1,0 +1,68 @@
+#!/bin/bash
+set -u
+set -e
+
+# TODO handle errors
+
+function basic_fix {
+	U=$1
+	G=$2
+	DIR=$3
+	echo " Basic fix: ${DIR}"
+	echo "   ownership ${U}:${G}"
+	chown -R --no-dereference ${U}:${G} "${DIR}"
+	echo "   ensure o-rwx and g-wx"
+	chmod -R o-rwx "${DIR}"
+	chmod -R g-wx "${DIR}"
+	echo "   ensure u+rw and g+r"
+	chmod -R u+rw "${DIR}"
+	chmod -R g+r "${DIR}"
+	echo "   fix directories"
+	for eachDir in `find ${DIR} -type d` ; do
+		chmod ug+x ${eachDir}
+	done
+}
+
+function group_w_fix {
+	U=$1
+	G=$2
+	DIR=$3
+	echo " GroupWritable fix: ${DIR}"
+	echo "   ownership ${U}:${G}"
+	chown -R --no-dereference ${U}:${G} "${DIR}"
+	echo "   ensure o-rwx"
+	chmod -R o-rwx "${DIR}"
+	echo "   ensure ug+rw"
+	chmod -R ug+rw "${DIR}"
+	echo "   fix directories"
+	for eachDir in `find ${DIR} -type d` ; do
+		chmod ug+x ${eachDir}
+	done
+}
+
+echo "Fixing permissions..."
+
+## resolve links - $0 may be a symlink
+SELF_PATH="$0"
+while [ -h "$SELF_PATH" ] ; do
+  ls=`ls -ld "$SELF_PATH"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+  SELF_PATH="$link"
+  else
+  SELF_PATH=`dirname "$SELF_PATH"`"/$link"
+  fi
+done
+
+basic_fix "gitosis" "gitosis" "/home/gitosis"
+basic_fix "redmine" "redmine" "/home/redmine"
+basic_fix "redmine" "redmine" "`dirname ${SELF_PATH}`/../opt/redmine-0.8.6"
+basic_fix "sonar" "sonar" "/home/sonar"
+basic_fix "sonar" "sonar" "`dirname ${SELF_PATH}`/../opt/sonar-1.11.1"
+basic_fix "tomcat" "tomcat" "/home/tomcat"
+basic_fix "tomcat" "tomcat" "`dirname ${SELF_PATH}`/../opt/apache-tomcat-6.0.20"
+group_w_fix "tomcat" "hudson" "/home/hudson"
+group_w_fix "tomcat" "nexus" "/home/nexus"
+
+
+exit 0

@@ -1,0 +1,30 @@
+
+production:
+  adapter: mysql
+  database: redmine
+  host: localhost
+  username: redmine
+  password: redmine
+  encoding: utf8
+  socket: /var/run/mysqld/mysqld.sock
+
+
+development:
+  adapter: mysql
+  database: redmine_development
+  host: localhost
+  username: redmine
+  password: redmine
+  encoding: utf8
+  socket: /var/run/mysqld/mysqld.sock
+
+
+test:
+  adapter: mysql
+  database: redmine_test
+  host: localhost
+  username: redmine
+  password: redmine
+  encoding: utf8
+  socket: /var/run/mysqld/mysqld.sock
+

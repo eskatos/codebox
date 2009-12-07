@@ -1,0 +1,6 @@
+target
+overlay/opt
+overlay/etc/nginx/ssl
+overlay/etc/nginx/sites-available
+overlay/etc/nginx/sites-enabled
+overlay/bin/sonar

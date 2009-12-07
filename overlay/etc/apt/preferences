@@ -1,0 +1,11 @@
+# Tous les paquets de la cible testing ont une priorité de 200
+# le a=testing est là pour dire à apt quelle archive utiliser
+Package: *
+Pin: release a=testing
+Pin-Priority: 500
+
+# Les paquets de la cible stable reste avec un priorité supérieure, pour
+# éviter que les paquets de testing remplacent tous ceux de stable.
+Package: *
+Pin: release a=stable
+Pin-Priority: 990
