@@ -31,6 +31,8 @@ server {
     }
 
     location /redmine {
+        client_max_body_size    4M;
+        client_body_buffer_size 128k;
         proxy_pass              http://127.0.0.1:3000/redmine;
         proxy_redirect          off;
         proxy_set_header        Host                $host;
@@ -49,6 +51,8 @@ server {
     }
 
     location /nexus {
+        client_max_body_size    4M;
+        client_body_buffer_size 128k;
         proxy_pass              http://127.0.0.1:8080/nexus;
         proxy_redirect          off;
         proxy_set_header        Host                $host;
