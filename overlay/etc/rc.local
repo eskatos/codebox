@@ -11,7 +11,12 @@
 #
 # By default this script does nothing.
 
+
 cd /home/codebox-admin/overlay/opt/redmine
+MONGREL_PID="/home/codebox-admin/overlay/opt/redmine/log/mongrel.pid"
+if [ -e ${MONGREL_PID} ] ; then
+        sudo -u redmine rm -f /home/codebox-admin/overlay/opt/redmine/log/mongrel.pid
+fi
 sudo -u redmine mongrel_rails start -e production -d --prefix=/redmine
 cd -
 

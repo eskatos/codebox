@@ -9,8 +9,8 @@ fi
 
 echo "Installing codebox-install dependencies plus sun-java-jdk so you accept its license"
 
-aptitude install -y ruby1.8 rubygems1.8 libopenssl-ruby1.8 ruby sun-java6-jdk
-gem install systemu
+aptitude install -y ruby1.8 rubygems1.8 libopenssl-ruby1.8 ruby sun-java6-jdk libsystemu-ruby1.8 libsystemu-ruby
+#gem install systemu
 
 echo
 echo "Minimal dependencies installed, you can now run the codebox-install script"
