@@ -12,6 +12,7 @@
 # By default this script does nothing.
 
 cd /home/codebox-admin/overlay/opt/redmine
+rm -f log/mongrel.pid
 sudo -u redmine mongrel_rails start -e production -d --prefix=/redmine
 cd -
 
