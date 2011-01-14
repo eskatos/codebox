@@ -1,11 +1,13 @@
 
 server {
+    server_tokens               off;
     listen                      80;
     server_name                 <%= @user_input[:domainname] %>;
     rewrite                     ^/(.*)              https://$server_name/$1 permanent;
 }
 
 server {
+    server_tokens               off;
     listen                      443;
     server_name                 <%= @user_input[:domainname] %>;
 
